@@ -2,60 +2,94 @@ import requests as rq
 import pandas as pd
 from doctors_data.doctor_model import Doctor
 from typing import List
-import re
 from dataclasses import asdict
 from doctors_data.doctor_data import YearlyDoctorData
 
 
+# Function to fetch doctor data
 def getDoctorData(url, year):
-    response = rq.get(url)
-    if response.status_code == 200:
-        api_data = response.json()
-        records_filtered = api_data.get("recordsFiltered", 0)
-        print(records_filtered)
-        data = api_data.get("data", [])
+    try:
+        response = rq.get(url)
+        if response.status_code == 200:
+            api_data = response.json()
 
-        # Parse the API response data
-        doctors = parse_data(data)
+            records_filtered = api_data.get("recordsFiltered", 0)
+            print(f"Year {year}: {records_filtered} records found.")
 
-        # Generate a filename based on the year
-        filename = fr"C:\Users\gtush\Desktop\DoctorsData\Data\doctors_{year}.csv"
+            # Ensure data is a list
+            data = api_data.get("data", [])
+            if not isinstance(data, list):
+                print(f"Unexpected data format for year {year}. Skipping.")
+                return
 
-        # Save the data to CSV
-        save_to_csv_with_pandas(doctors, filename)
-        print(f"Year {year}: Processed {len(doctors)} records and saved to {filename}")
-    else:
-        print(f"Failed to fetch data for year {year}. HTTP Status Code: {response.status_code}")
+            doctors = parse_data(data)
+
+            # Generate a filename based on the year
+            filename = fr"C:\Users\gtush\Desktop\DoctorsData\Data\doctors_{year}.csv"
+
+            # Save the data to CSV
+            save_to_csv_with_pandas(doctors, filename)
+            print(f"Year {year}: Processed {len(doctors)} records and saved to {filename}")
+
+        else:
+            print(f"Failed to fetch data for year {year}. HTTP Status Code: {response.status_code}")
+
+    except Exception as e:
+        print(f"Error fetching data for year {year}: {str(e)}")
 
 
-# Function to parse and extract details from the provided JSON
+# Function to parse and extract details from the JSON response
 def parse_data(data: List[List]) -> List[Doctor]:
     doctors = []
     for record in data:
-        # Extract doctorId and regdNoValue from the 'onclick' attribute
-        onclick_match = re.search(r"openDoctorDetailsnew\('(\d+)', '([\w\s]+)'\)", record[6])
-        if onclick_match:
-            doctor_id = onclick_match.group(1)  # Extract doctorId
-        else:
-            doctor_id = None
-
-        # Create a Doctor instance
+        # Extract doctorId and registration number correctly from the list
         doctor = Doctor(
-            id=record[0],
-            year=record[1],
-            medical_council=record[3],
-            doctor_name=record[4],
-            relation=record[5],
-            doctor_id=doctor_id,
-            registration_number=str(record[2]),  # Convert registration_number to string
+            id=record[0],  # doctorId
+            year=record[1],  # Year
+            reg_date=record[2],  # Registration Date
+            doctor_id=record[0],  # Same as id
+            salutation=None,  # No index for salutation
+            first_name=record[4],  # Doctor Name
+            middle_name=None,  # Not in dataset
+            last_name=None,  # Not in dataset
+            phone_no=None,  # Not in dataset
+            email_id=None,  # Not in dataset
+            gender=None,  # Not in dataset
+            blood_group=None,  # Not in dataset
+            parent_name=record[5],  # Parent Name
+            birth_date=None,  # Not in dataset
+            birth_date_str=None,  # Not in dataset
+            doctor_degree=None,  # Not in dataset
+            university=None,  # Not in dataset
+            year_of_passing=None,  # Not in dataset
+            registration_number=record[2],  # Registration Number
+            smc_name=record[3],  # Medical Council Name
+            address=None,  # Not in dataset
+            city=None,  # Not in dataset
+            state=None,  # Not in dataset
+            country=None,  # Not in dataset
+            pincode=None,  # Not in dataset
+            additional_qualification_1=None,
+            additional_qualification_year_1=None,
+            additional_qualification_university_1=None,
+            additional_qualification_2=None,
+            additional_qualification_year_2=None,
+            additional_qualification_university_2=None,
+            additional_qualification_3=None,
+            additional_qualification_year_3=None,
+            additional_qualification_university_3=None
         )
         doctors.append(doctor)
     return doctors
 
 
-# Save to CSV using pandas
+# Save data to CSV using pandas
 def save_to_csv_with_pandas(doctors: List[Doctor], filename: str):
-    # Convert list of dataclass objects to a list of dictionaries
+    if not doctors:
+        print(f"No valid doctor data to save for {filename}. Skipping.")
+        return
+
+    # Convert list of dataclass objects to dictionaries
     data_dicts = [asdict(doctor) for doctor in doctors]
 
     # Create a DataFrame from the list of dictionaries
@@ -66,12 +100,15 @@ def save_to_csv_with_pandas(doctors: List[Doctor], filename: str):
 
 
 if __name__ == '__main__':
-    years = [2018, 2019, 2020, 2021, 2022, 2023]
-    lengths = [58341, 61607, 44978, 31854, 20077, 7751]
+    file_path = r'C:\Users\gtush\Desktop\DoctorsData\Data\records_total.csv'
+    readFile = pd.read_csv(file_path)
+    years = readFile['Year']
+    lengths = readFile['RecordsTotal']
+
     # Create a list of YearlyDoctorData objects
     yearly_data = [YearlyDoctorData(year=year, doctor_count=length) for year, length in zip(years, lengths)]
 
     for item in yearly_data:
-        url = f'https://www.nmc.org.in/MCIRest/open/getPaginatedData?service=getPaginatedDoctor&draw=1&columns%5B0%5D%5Bdata%5D=0&columns%5B0%5D%5Bname%5D=&columns%5B0%5D%5Bsearchable%5D=true&columns%5B0%5D%5Borderable%5D=true&columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B1%5D%5Bdata%5D=1&columns%5B1%5D%5Bname%5D=&columns%5B1%5D%5Bsearchable%5D=true&columns%5B1%5D%5Borderable%5D=true&columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B2%5D%5Bdata%5D=2&columns%5B2%5D%5Bname%5D=&columns%5B2%5D%5Bsearchable%5D=true&columns%5B2%5D%5Borderable%5D=true&columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B3%5D%5Bdata%5D=3&columns%5B3%5D%5Bname%5D=&columns%5B3%5D%5Bsearchable%5D=true&columns%5B3%5D%5Borderable%5D=true&columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B4%5D%5Bdata%5D=4&columns%5B4%5D%5Bname%5D=&columns%5B4%5D%5Bsearchable%5D=true&columns%5B4%5D%5Borderable%5D=true&columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B5%5D%5Bdata%5D=5&columns%5B5%5D%5Bname%5D=&columns%5B5%5D%5Bsearchable%5D=true&columns%5B5%5D%5Borderable%5D=true&columns%5B5%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B5%5D%5Bsearch%5D%5Bregex%5D=false&columns%5B6%5D%5Bdata%5D=6&columns%5B6%5D%5Bname%5D=&columns%5B6%5D%5Bsearchable%5D=true&columns%5B6%5D%5Borderable%5D=true&columns%5B6%5D%5Bsearch%5D%5Bvalue%5D=&columns%5B6%5D%5Bsearch%5D%5Bregex%5D=false&order%5B0%5D%5Bcolumn%5D=0&order%5B0%5D%5Bdir%5D=asc&start=0&length={item.doctor_count}&search%5Bvalue%5D=&search%5Bregex%5D=false&name=&registrationNo=&smcId=&year={item.year}&_=1733728970660'
+        url = f'https://www.nmc.org.in/MCIRest/open/getPaginatedData?service=getPaginatedDoctor&draw=1' \
+              f'&start=0&length={item.doctor_count}&year={item.year}'
         getDoctorData(url, item.year)
-
