@@ -23,7 +23,7 @@ def fetch_doctor_data(row):
     doctor_id = str(int(float(row["doctor_id"])))  # Convert to integer if it has a decimal
 
     # Ensure the registration number has at least 6 characters
-    registration_value = registration_value.zfill(6)
+    registration_value = registration_value.zfill(3)
 
     payload = {
         "doctorId": doctor_id,
@@ -31,15 +31,18 @@ def fetch_doctor_data(row):
     }
 
     try:
-        response = rq.post(URL, json=payload, headers=HEADERS, timeout=10)
+
+        response = rq.post(URL, json=payload)
 
         if response.status_code == 200:
             try:
                 json_data = response.json()
+                print(json_data)
                 if not json_data:
                     print(f"⚠ Warning: Empty JSON response for Doctor ID {doctor_id}")
                     return None
 
+                print("Registration: ", registration_value)
                 # Convert JSON response to Model instance
                 return Model(**json_data)
 
